@@ -50,7 +50,7 @@ func New(addr string) *Server {
 }
 
 // WithAuthenticator configures the server with an auth middleware for validating JWTs
-func (s *Server) WithAuthenticator(authnr *auth.Authenticator) *Server {
+func (s *Server) WithAuthenticator(authnr *Authenticator) *Server {
 	s.authMiddleware = newAuthenticationMiddleware(authnr)
 	return s
 }
@@ -98,7 +98,7 @@ func attachRequestLogger(logInstance *logrus.Entry) func(next http.Handler) http
 	}
 }
 
-func newAuthenticationMiddleware(authenticator *auth.Authenticator) func(next http.Handler) http.Handler {
+func newAuthenticationMiddleware(authenticator *Authenticator) func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if r.Method == http.MethodOptions {
@@ -118,7 +118,7 @@ func newAuthenticationMiddleware(authenticator *auth.Authenticator) func(next ht
 				return
 			}
 
-			r = r.WithContext(auth.SetBearerContext(r.Context(), *credentials))
+			r = r.WithContext(auth.SetIdentityContext(r.Context(), *credentials))
 
 			next.ServeHTTP(w, r)
 			return

@@ -9,11 +9,10 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestCreateBearer(t *testing.T) {
+func TestCreateAuthIdentity(t *testing.T) {
 	t.Run("no scope", func(t *testing.T) {
 		authDataJSONStr := []byte(`{
             "claims": {
-                "aid": "account_456",
                 "aud": "[client_222 client_111]",
                 "exp": "1.576422538e+09",
                 "iat": "1.576418938e+09",
@@ -28,19 +27,19 @@ func TestCreateBearer(t *testing.T) {
 		var authData = map[string]interface{}{}
 		json.Unmarshal(authDataJSONStr, &authData)
 
-		b, _ := createBearer(authData)
+		b, _ := createAuthIdentity(authData)
 
-		assert.Equal(t, auth.Bearer{
-			UserID:    "user_123",
-			AccountID: "account_456",
-			Scopes:    []string{},
+		assert.Equal(t, auth.Claims{
+			Version:  "00",
+			Issuer:   "https://identity.example.com",
+			Subject:  "user_123",
+			Audience: []string{"client_222", "client_111"},
 		}, b)
 	})
 
 	t.Run("yes scope", func(t *testing.T) {
 		authDataJSONStr := []byte(`{
             "claims": {
-                "aid": "account_456",
                 "aud": "[client_222 client_111]",
                 "exp": "1.576422538e+09",
                 "iat": "1.576418938e+09",
@@ -58,12 +57,14 @@ func TestCreateBearer(t *testing.T) {
 		var authData = map[string]interface{}{}
 		json.Unmarshal(authDataJSONStr, &authData)
 
-		b, _ := createBearer(authData)
+		b, _ := createAuthIdentity(authData)
 
-		assert.Equal(t, auth.Bearer{
-			UserID:    "user_123",
-			AccountID: "account_456",
-			Scopes:    []string{"one", "two"},
+		assert.Equal(t, auth.Claims{
+			Version:  "00",
+			Issuer:   "https://identity.example.com",
+			Subject:  "user_123",
+			Audience: []string{"client_222", "client_111"},
+			Scopes:   []string{"one", "two"},
 		}, b)
 	})
 
@@ -86,12 +87,14 @@ func TestCreateBearer(t *testing.T) {
 		var authData = map[string]interface{}{}
 		json.Unmarshal(authDataJSONStr, &authData)
 
-		b, _ := createBearer(authData)
+		b, _ := createAuthIdentity(authData)
 
-		assert.Equal(t, auth.Bearer{
-			UserID:    "some_other_service",
-			AccountID: "",
-			Scopes:    []string{"system"},
+		assert.Equal(t, auth.Claims{
+			Version:  "00",
+			Issuer:   "https://identity.example.com",
+			Subject:  "some_other_service",
+			Audience: []string{"client_222"},
+			Scopes:   []string{"system"},
 		}, b)
 	})
 }

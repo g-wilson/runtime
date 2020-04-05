@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/g-wilson/runtime"
+	"github.com/g-wilson/runtime/auth"
 	"github.com/g-wilson/runtime/hand"
 	"github.com/g-wilson/runtime/logger"
 
@@ -19,15 +20,26 @@ import (
 var errorType = reflect.TypeOf((*error)(nil)).Elem()
 var contextType = reflect.TypeOf((*context.Context)(nil)).Elem()
 
+// IdentityProviderFunc is a function which is executed on each RPC method if there is an identity in the requests context.
+// Use it to convert the runtime identity (which maps to JWT claims) to an application object.
+type IdentityProviderFunc func(ctx context.Context, identity auth.Claims) error
+
 // Service encapsulates an instance of an RPC Service
 type Service struct {
-	Logger  *logrus.Entry
-	Methods map[string]*Method
+	Logger           *logrus.Entry
+	Methods          map[string]*Method
+	IdentityProvider IdentityProviderFunc
 }
 
 // NewService creates a Service
 func NewService(l *logrus.Entry) *Service {
 	return &Service{Logger: l, Methods: make(map[string]*Method)}
+}
+
+// WithIdentityProvider attaches an identity provider function to the service
+func (s *Service) WithIdentityProvider(fn IdentityProviderFunc) *Service {
+	s.IdentityProvider = fn
+	return s
 }
 
 // AddMethod creates a Method and adds it to the service

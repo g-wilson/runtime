@@ -10,11 +10,11 @@ An example app can be found [here](https://github.com/g-wilson/runtime-helloworl
 
 ### RPC
 
-The main abstraction this library provides is the RPC Service type.
+The main abstraction this library provides is the RPC Service. It represents the "glue" layer between the execution environment (e.g. Lambda on HTTP API Gateway) and a generic Go application, provided by the developer.
 
-It uses reflection to link ordinary Go functions to a JSON interface. Provide a method name `string`, a handler function `interface{}`, and a JSON-Schema to get going.
+It uses reflection to link ordinary Go functions (from the developer's application) to an external JSON-based interface. Provide a method name `string`, a handler function `interface{}`, and a JSON-Schema for argument validation to get going.
 
-It represents the "glue" layer between the execution environment (e.g. Lambda on HTTP API Gateway) and a generic Go application, provided by the developer.
+The idea here is to provide standardised RPC behaviour regardless of execution environment. Unlike most frameworks which assume you want HTTP handling, `runtime` is designed to be portable between such environments. The best example of this is being able to run a service on AWS Lambda, and invoke it through an API Gateway, whilst also being able to run the service as part of a Go HTTP server.
 
 Internally, it provides several utilities expected of a modern application such as a pattern for error responses, a contextual logger (logs request details but can also be used by the application), and an abstraction for authentication state.
 
@@ -36,11 +36,11 @@ The Go context within a method is provided with a context-aware logger. This sho
 
 ### Authentication
 
-A lightweight `Bearer` type is provided and attached to the request context to encapsulate authentication state. It is quite specific to JWTs.
+A lightweight `Claims` type is provided and attached to the request context to encapsulate authentication state. It is quite specific to JWTs.
 
-There is no built-in authentication or token validation to the RPC Service itself. It is assumed that you'd run any automatic authentication provided by the execution environment, for example JWT Authorizers in AWS API Gateway.
+There is no built-in authentication or token validation to the RPC Service itself. It is assumed that you'd run any automatic authentication provided by the execution environment, for example JWT Authorizers in AWS API Gateway. However, there is a JWT validation utility which is designed for use by the development server.
 
-However, there is a JWT validation utility which is designed for use by the development server.
+Services can define an "Identity Provider" which can be used to convert the standard claims struct into a more useful application type.
 
 ### Development Server
 
@@ -48,5 +48,6 @@ A basic HTTP server is provided which allows you to invoke RPC Methods locally.
 
 ## Future scope
 
-- Explain how service-to-service communication can be authenticated
+- API versioning
+- Explain in the readme how service-to-service communication can be implemented
 - Add support for asynchronous services rather than just RPC-style (e.g. using SQS as the trigger instead of API Gateway)

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/g-wilson/runtime"
 	"github.com/g-wilson/runtime/auth"
@@ -25,19 +26,20 @@ func (s *Service) WrapAPIGatewayHTTP() LambdaAPIGatewayHandler {
 		reqLogger := logger.FromContext(ctx)
 
 		if event.RequestContext.Authorizer != nil {
-			bearer, err := createBearer(event.RequestContext.Authorizer)
+			identity, err := createAuthIdentity(event.RequestContext.Authorizer)
 			if err != nil {
 				reqLogger.Entry().WithError(fmt.Errorf("wrap http api gateway: authorizer parsing failed: %w", err)).Error("request failed")
 				return apiGatewayErrorResponse(err), nil
 			}
 
-			ctx = auth.SetBearerContext(ctx, bearer)
+			ctx = auth.SetIdentityContext(ctx, identity)
 
-			if bearer.UserID != "" {
-				reqLogger.Update(reqLogger.Entry().WithField("user_id", bearer.UserID))
-			}
-			if bearer.AccountID != "" {
-				reqLogger.Update(reqLogger.Entry().WithField("account_id", bearer.AccountID))
+			if s.IdentityProvider != nil {
+				err = s.IdentityProvider(ctx, identity)
+				if err != nil {
+					reqLogger.Entry().WithError(fmt.Errorf("wrap http api gateway: service identity provider failed: %w", err)).Error("request failed")
+					return apiGatewayErrorResponse(err), nil
+				}
 			}
 		}
 
@@ -130,34 +132,36 @@ func apiGatewayErrorResponse(err error) events.APIGatewayProxyResponse {
 	}
 }
 
-func createBearer(authdata map[string]interface{}) (auth.Bearer, error) {
-	bearer := auth.Bearer{Scopes: []string{}}
+func createAuthIdentity(authdata map[string]interface{}) (auth.Claims, error) {
+	identity := auth.Claims{}
 
 	claims, ok := authdata["claims"].(map[string]interface{})
 	if !ok {
-		return bearer, nil
+		return identity, nil
 	}
 
+	if jti, ok := claims["jti"].(string); ok {
+		identity.ID = jti
+	}
 	if version, ok := claims["v"].(string); ok {
-		if version != "00" {
-			return bearer, errors.New("invalid token version")
-		}
+		identity.Version = version
 	}
-
-	if userID, ok := claims["sub"].(string); ok {
-		bearer.UserID = userID
+	if issuer, ok := claims["iss"].(string); ok {
+		identity.Issuer = issuer
 	}
-	if accountID, ok := claims["aid"].(string); ok {
-		bearer.AccountID = accountID
+	if sub, ok := claims["sub"].(string); ok {
+		identity.Subject = sub
 	}
-
+	if aud, ok := claims["aud"].(string); ok {
+		identity.Audience = strings.Split(strings.Trim(aud, "[]"), " ")
+	}
 	if scopes, ok := authdata["scopes"].([]interface{}); ok {
 		for _, sc := range scopes {
 			if scStr, ok := sc.(string); ok {
-				bearer.Scopes = append(bearer.Scopes, scStr)
+				identity.Scopes = append(identity.Scopes, scStr)
 			}
 		}
 	}
 
-	return bearer, nil
+	return identity, nil
 }
