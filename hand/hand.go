@@ -46,3 +46,11 @@ func Wrap(code string, err error) E {
 func Errorf(msg string, values ...interface{}) E {
 	return New(fmt.Sprintf(msg, values...))
 }
+
+func Matches(err error, comparator E) bool {
+	handErr, ok := err.(E)
+	if !ok {
+		return false
+	}
+	return handErr.Code == comparator.Code
+}
