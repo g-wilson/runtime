@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	"github.com/g-wilson/runtime"
-	"github.com/g-wilson/runtime/auth"
 	"github.com/g-wilson/runtime/hand"
 	"github.com/g-wilson/runtime/logger"
 
@@ -25,20 +24,26 @@ func (s *Service) WrapAPIGatewayHTTP() LambdaAPIGatewayHandler {
 		ctx = logger.SetContext(ctx, s.Logger.WithField("request_id", event.RequestContext.RequestID))
 		reqLogger := logger.FromContext(ctx)
 
-		if event.RequestContext.Authorizer != nil {
-			identity, err := createAuthIdentity(event.RequestContext.Authorizer)
+		if event.RequestContext.Authorizer != nil && s.IdentityProvider != nil {
+			authdata := event.RequestContext.Authorizer
 			if err != nil {
 				reqLogger.Entry().WithError(fmt.Errorf("wrap http api gateway: authorizer parsing failed: %w", err)).Error("request failed")
 				return apiGatewayErrorResponse(err), nil
 			}
 
-			ctx = auth.SetIdentityContext(ctx, identity)
+			atclaims := AccessTokenClaims{}
 
-			if s.IdentityProvider != nil {
-				err = s.IdentityProvider(ctx, identity)
-				if err != nil {
-					reqLogger.Entry().WithError(fmt.Errorf("wrap http api gateway: service identity provider failed: %w", err)).Error("request failed")
-					return apiGatewayErrorResponse(err), nil
+			if claims, ok := authdata["claims"].(map[string]interface{}); ok {
+				atclaims = claims
+
+				// apig jwt authorizer coerces audience to a string, split it for better compatibility
+				if audstr, ok := claims["aud"].(string); ok {
+					atclaims["aud"] = strings.Split(strings.Trim(audstr, "[]"), " ")
+				}
+
+				// apig jwt authorizer extracts scope string into scopes array, undo it for better compatibility
+				if scopes, ok := authdata["scopes"].([]string); ok {
+					atclaims["scope"] = strings.Join(scopes, " ")
 				}
 			}
 		}
@@ -130,38 +135,4 @@ func apiGatewayErrorResponse(err error) events.APIGatewayProxyResponse {
 			"Content-Type": "application/json; charset=utf-8",
 		},
 	}
-}
-
-func createAuthIdentity(authdata map[string]interface{}) (auth.Claims, error) {
-	identity := auth.Claims{}
-
-	claims, ok := authdata["claims"].(map[string]interface{})
-	if !ok {
-		return identity, nil
-	}
-
-	if jti, ok := claims["jti"].(string); ok {
-		identity.ID = jti
-	}
-	if version, ok := claims["v"].(string); ok {
-		identity.Version = version
-	}
-	if issuer, ok := claims["iss"].(string); ok {
-		identity.Issuer = issuer
-	}
-	if sub, ok := claims["sub"].(string); ok {
-		identity.Subject = sub
-	}
-	if aud, ok := claims["aud"].(string); ok {
-		identity.Audience = strings.Split(strings.Trim(aud, "[]"), " ")
-	}
-	if scopes, ok := authdata["scopes"].([]interface{}); ok {
-		for _, sc := range scopes {
-			if scStr, ok := sc.(string); ok {
-				identity.Scopes = append(identity.Scopes, scStr)
-			}
-		}
-	}
-
-	return identity, nil
 }

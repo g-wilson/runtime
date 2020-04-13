@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/g-wilson/runtime"
-	"github.com/g-wilson/runtime/auth"
 	"github.com/g-wilson/runtime/hand"
 	"github.com/g-wilson/runtime/logger"
 	"github.com/g-wilson/runtime/rpcservice"
@@ -49,20 +48,14 @@ func New(addr string) *Server {
 	return s
 }
 
-// WithAuthenticator configures the server with an auth middleware for validating JWTs
-func (s *Server) WithAuthenticator(authnr *Authenticator) *Server {
-	s.authMiddleware = newAuthenticationMiddleware(authnr)
-	return s
-}
-
 // AddService maps an RPC Service's methods to HTTP path on the server's router
-func (s *Server) AddService(path string, svc *rpcservice.Service, authenticator bool) *Server {
+func (s *Server) AddService(path string, svc *rpcservice.Service, authnr *Authenticator) *Server {
 	s.r.Route(fmt.Sprintf("/%s", path), func(r chi.Router) {
-		r.Options("/*", optionsHandler)
-
-		if authenticator {
-			r.Use(s.authMiddleware)
+		if authnr != nil {
+			r.Use(newAuthenticationMiddleware(authnr, svc.IdentityProvider))
 		}
+
+		r.Options("/*", optionsHandler)
 
 		for name, method := range svc.Methods {
 			r.Post("/"+name, wrapRPCMethod(method))
@@ -98,7 +91,7 @@ func attachRequestLogger(logInstance *logrus.Entry) func(next http.Handler) http
 	}
 }
 
-func newAuthenticationMiddleware(authenticator *Authenticator) func(next http.Handler) http.Handler {
+func newAuthenticationMiddleware(authenticator *Authenticator, identityProvider rpcservice.IdentityContextProvider) func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if r.Method == http.MethodOptions {
@@ -112,13 +105,21 @@ func newAuthenticationMiddleware(authenticator *Authenticator) func(next http.Ha
 				return
 			}
 
-			credentials, err := authenticator.Authenticate(r.Context(), token)
+			claims, err := authenticator.Authenticate(r.Context(), token)
 			if err != nil {
 				sendHTTPError(w, err)
 				return
 			}
 
-			r = r.WithContext(auth.SetIdentityContext(r.Context(), *credentials))
+			ctx := identityProvider(r.Context(), claims)
+			if err != nil {
+				reqLogger := logger.FromContext(r.Context())
+				reqLogger.Entry().WithError(fmt.Errorf("service identity provider failed: %w", err)).Error("request failed")
+				sendHTTPError(w, hand.New("authentication_error"))
+				return
+			}
+
+			r = r.WithContext(ctx)
 
 			next.ServeHTTP(w, r)
 			return

@@ -2,17 +2,21 @@ package devserver
 
 import (
 	"context"
-	"strings"
 	"time"
 
 	"github.com/g-wilson/runtime"
-	"github.com/g-wilson/runtime/auth"
 	"github.com/g-wilson/runtime/hand"
 	"github.com/g-wilson/runtime/logger"
+	"github.com/g-wilson/runtime/rpcservice"
 
 	"gopkg.in/square/go-jose.v2"
 	"gopkg.in/square/go-jose.v2/jwt"
 )
+
+type AccessTokenClaims struct {
+	rpcservice.AccessTokenClaims
+	jwt.Claims
+}
 
 // Authenticator type is used to validate JWT access tokens and convert them into Bearer
 // types which can be used by runtime to evaluate authentication state
@@ -30,17 +34,13 @@ func NewAuthenticator(keys *jose.JSONWebKeySet, issuer string) *Authenticator {
 }
 
 // Authenticate validates the provided JWT access token and returns a Bearer
-func (a *Authenticator) Authenticate(ctx context.Context, token string) (*auth.Claims, error) {
+func (a *Authenticator) Authenticate(ctx context.Context, token string) (rpcservice.AccessTokenClaims, error) {
 	tok, err := jwt.ParseSigned(token)
 	if err != nil {
 		return nil, hand.New(runtime.ErrCodeInvalidToken).WithMessage("jwt parse error")
 	}
 
-	cl := struct {
-		Version string `json:"v"`
-		Scope   string `json:"scope"`
-		jwt.Claims
-	}{}
+	cl := AccessTokenClaims{}
 	if err := tok.Claims(a.Keys, &cl); err != nil {
 		return nil, err
 	}
@@ -57,11 +57,5 @@ func (a *Authenticator) Authenticate(ctx context.Context, token string) (*auth.C
 		return nil, hand.New(runtime.ErrCodeInvalidToken).WithMessage("jwt validation error")
 	}
 
-	return &auth.Claims{
-		Version:  cl.Version,
-		Subject:  cl.Subject,
-		Audience: cl.Audience,
-		Issuer:   cl.Issuer,
-		Scopes:   strings.Split(cl.Scope, " "),
-	}, nil
+	return cl.AccessTokenClaims, nil
 }
