@@ -61,9 +61,7 @@ func FromContext(ctx context.Context) *ContextSafeLogger {
 		return ctxLogger
 	}
 
-	return &ContextSafeLogger{
-		entry: logrus.NewEntry(logrus.New()).WithField("W A R N I N G", "context safe logger not set"),
-	}
+	return nil
 }
 
 // Update replaces the logger
