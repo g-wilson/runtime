@@ -26,7 +26,7 @@ func (s *Service) WrapAPIGatewayHTTP() LambdaAPIGatewayHandler {
 
 		if s.IdentityProvider != nil {
 			authdata := event.RequestContext.Authorizer.JWT
-			atclaims := map[string]interface{}{}
+			atclaims := AccessTokenClaims{}
 			atclaims["scope"] = strings.Join(authdata.Scopes, " ")
 
 			for key, val := range authdata.Claims {
@@ -37,6 +37,8 @@ func (s *Service) WrapAPIGatewayHTTP() LambdaAPIGatewayHandler {
 					atclaims[key] = val
 				}
 			}
+
+			s.IdentityProvider(ctx, atclaims)
 		}
 
 		if len(event.PathParameters) < 1 {
