@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"time"
 
@@ -21,9 +20,9 @@ import (
 // Server is our dev server instance
 type Server struct {
 	ListenAddress string
+	Log           *logrus.Entry
 
 	authMiddleware func(next http.Handler) http.Handler
-	log            *logrus.Entry
 	r              *chi.Mux
 }
 
@@ -41,7 +40,7 @@ func New(addr string) *Server {
 
 	s := &Server{
 		ListenAddress: addr,
-		log:           log,
+		Log:           log,
 		r:             r,
 	}
 
@@ -67,10 +66,10 @@ func (s *Server) AddService(path string, svc *rpcservice.Service, authnr *Authen
 
 // Listen starts listening for HTTP requests and blocks unless it panics
 func (s *Server) Listen() {
-	log.Printf("runtime dev server listening on %q\n", s.ListenAddress)
+	s.Log.Infof("runtime dev server listening on %q\n", s.ListenAddress)
 
 	if err := http.ListenAndServe(s.ListenAddress, s.r); err != http.ErrServerClosed {
-		log.Fatalf("Could not listen on %q: %s\n", s.ListenAddress, err)
+		s.Log.Fatalf("Could not listen on %q: %s\n", s.ListenAddress, err)
 	}
 }
 
@@ -101,24 +100,31 @@ func newAuthenticationMiddleware(authenticator *Authenticator, identityProvider 
 
 			token := r.Header.Get("authorization")
 			if token == "" {
-				sendHTTPError(w, hand.New("authentication_required"))
+				err := hand.New("authentication_required")
+				logger.FromContext(r.Context()).Entry().WithError(err).Error("request failed")
+				sendHTTPError(w, err)
 				return
 			}
 
 			claims, err := authenticator.Authenticate(r.Context(), token)
 			if err != nil {
+				reqLogger := logger.FromContext(r.Context())
+				reqLogger.Entry().WithError(fmt.Errorf("jwt authenticator failed: %w", err)).Error("request failed")
 				sendHTTPError(w, err)
 				return
 			}
 
-			ctx := identityProvider(r.Context(), claims)
-			if err != nil {
-				reqLogger := logger.FromContext(r.Context())
-				reqLogger.Entry().WithError(fmt.Errorf("service identity provider failed: %w", err)).Error("request failed")
-				sendHTTPError(w, hand.New("authentication_error"))
-				return
+			cl := rpcservice.AccessTokenClaims{
+				"exp": claims.Expiry,
+				"aud": claims.Audience,
+				"jti": claims.ID,
+				"iat": claims.IssuedAt,
+				"iss": claims.Issuer,
+				"nbf": claims.NotBefore,
+				"sub": claims.Subject,
 			}
 
+			ctx := identityProvider(r.Context(), cl)
 			r = r.WithContext(ctx)
 
 			next.ServeHTTP(w, r)
@@ -161,6 +167,7 @@ func wrapRPCMethod(method *rpcservice.Method) http.HandlerFunc {
 			sendHTTPError(w, hand.New(runtime.ErrCodeUnknown))
 		}
 
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(http.StatusOK)
 		w.Write(resBytes)
 	}
@@ -212,6 +219,7 @@ func sendHTTPError(w http.ResponseWriter, err error) {
 		body = []byte(`{"code":"error_serialisation_fail"}`)
 	}
 
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(status)
 	w.Write(body)
 }

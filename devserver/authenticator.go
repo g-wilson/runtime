@@ -33,14 +33,14 @@ func NewAuthenticator(keys *jose.JSONWebKeySet, issuer string) *Authenticator {
 	}
 }
 
-// Authenticate validates the provided JWT access token and returns a Bearer
-func (a *Authenticator) Authenticate(ctx context.Context, token string) (rpcservice.AccessTokenClaims, error) {
+// Authenticate validates the provided JWT access token and returns the claims
+func (a *Authenticator) Authenticate(ctx context.Context, token string) (*jwt.Claims, error) {
 	tok, err := jwt.ParseSigned(token)
 	if err != nil {
 		return nil, hand.New(runtime.ErrCodeInvalidToken).WithMessage("jwt parse error")
 	}
 
-	cl := AccessTokenClaims{}
+	cl := jwt.Claims{}
 	if err := tok.Claims(a.Keys, &cl); err != nil {
 		return nil, err
 	}
@@ -57,5 +57,5 @@ func (a *Authenticator) Authenticate(ctx context.Context, token string) (rpcserv
 		return nil, hand.New(runtime.ErrCodeInvalidToken).WithMessage("jwt validation error")
 	}
 
-	return cl.AccessTokenClaims, nil
+	return &cl, nil
 }
