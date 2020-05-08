@@ -16,34 +16,25 @@ import (
 )
 
 // LambdaAPIGatewayHandler is the expected function signature for AWS Lambda functions consuming events from API Gateway
-type LambdaAPIGatewayHandler func(context.Context, events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error)
+type LambdaAPIGatewayHandler func(context.Context, events.APIGatewayV2HTTPRequest) (events.APIGatewayProxyResponse, error)
 
 // WrapAPIGatewayHTTP wraps the service methods and returns a Lambda compatible handler function for HTTP API Gateway requests
 func (s *Service) WrapAPIGatewayHTTP() LambdaAPIGatewayHandler {
-	return func(ctx context.Context, event events.APIGatewayProxyRequest) (res events.APIGatewayProxyResponse, err error) {
+	return func(ctx context.Context, event events.APIGatewayV2HTTPRequest) (res events.APIGatewayProxyResponse, err error) {
 		ctx = logger.SetContext(ctx, s.Logger.WithField("request_id", event.RequestContext.RequestID))
 		reqLogger := logger.FromContext(ctx)
 
-		if event.RequestContext.Authorizer != nil && s.IdentityProvider != nil {
-			authdata := event.RequestContext.Authorizer
-			if err != nil {
-				reqLogger.Entry().WithError(fmt.Errorf("wrap http api gateway: authorizer parsing failed: %w", err)).Error("request failed")
-				return apiGatewayErrorResponse(err), nil
-			}
+		if s.IdentityProvider != nil {
+			authdata := event.RequestContext.Authorizer.JWT
+			atclaims := map[string]interface{}{}
+			atclaims["scope"] = strings.Join(authdata.Scopes, " ")
 
-			atclaims := AccessTokenClaims{}
-
-			if claims, ok := authdata["claims"].(map[string]interface{}); ok {
-				atclaims = claims
-
+			for key, val := range authdata.Claims {
 				// apig jwt authorizer coerces audience to a string, split it for better compatibility
-				if audstr, ok := claims["aud"].(string); ok {
-					atclaims["aud"] = strings.Split(strings.Trim(audstr, "[]"), " ")
-				}
-
-				// apig jwt authorizer extracts scope string into scopes array, undo it for better compatibility
-				if scopes, ok := authdata["scopes"].([]string); ok {
-					atclaims["scope"] = strings.Join(scopes, " ")
+				if key == "aud" {
+					atclaims["aud"] = strings.Split(strings.Trim(val, "[]"), " ")
+				} else {
+					atclaims[key] = val
 				}
 			}
 		}
