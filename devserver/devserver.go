@@ -114,17 +114,7 @@ func newAuthenticationMiddleware(authenticator *Authenticator, identityProvider 
 				return
 			}
 
-			cl := rpcservice.AccessTokenClaims{
-				"exp": claims.Expiry,
-				"aud": claims.Audience,
-				"jti": claims.ID,
-				"iat": claims.IssuedAt,
-				"iss": claims.Issuer,
-				"nbf": claims.NotBefore,
-				"sub": claims.Subject,
-			}
-
-			ctx := identityProvider(r.Context(), cl)
+			ctx := identityProvider(r.Context(), claims)
 			r = r.WithContext(ctx)
 
 			next.ServeHTTP(w, r)
