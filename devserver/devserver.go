@@ -127,16 +127,11 @@ func newAuthenticationMiddleware(authenticator *Authenticator, identityProvider 
 	}
 }
 
-func optionsHandler(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Access-Control-Allow-Origin", "*")
-	w.Header().Set("Access-Control-Allow-Methods", "DELETE,GET,HEAD,PUT,POST,PATCH,OPTIONS")
-	w.Header().Set("Access-Control-Allow-Headers", "Authorization,Content-Type,Host,Origin,Accept")
-	w.WriteHeader(204)
-}
-
 func wrapRPCMethod(method *rpcservice.Method) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		reqLogger := logger.FromContext(r.Context())
+
+		setCORSHeaders(w)
 
 		if r.Body == nil {
 			http.Error(w, runtime.ErrCodeMissingBody, http.StatusBadRequest)
@@ -166,17 +161,20 @@ func wrapRPCMethod(method *rpcservice.Method) http.HandlerFunc {
 			sendHTTPError(w, hand.New(runtime.ErrCodeUnknown))
 		}
 
-		sendHTTPResponse(w, resBytes, http.StatusOK)
+		w.WriteHeader(http.StatusOK)
+		w.Write(resBytes)
 	}
 }
 
-func sendHTTPResponse(w http.ResponseWriter, body []byte, status int) {
+func setCORSHeaders(w http.ResponseWriter) {
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Access-Control-Allow-Methods", "DELETE,GET,HEAD,PUT,POST,PATCH,OPTIONS")
 	w.Header().Set("Access-Control-Allow-Headers", "Authorization,Content-Type,Host,Origin,Accept")
-	w.Header().Set("Content-Type", "application/json; charset=utf8")
-	w.WriteHeader(status)
-	w.Write(body)
+}
+
+func optionsHandler(w http.ResponseWriter, r *http.Request) {
+	setCORSHeaders(w)
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func sendHTTPError(w http.ResponseWriter, err error) {
@@ -209,10 +207,11 @@ func sendHTTPError(w http.ResponseWriter, err error) {
 		status = http.StatusInternalServerError
 	}
 
-	errBytes, err := json.Marshal(handErr)
+	body, err := json.Marshal(handErr)
 	if err != nil {
-		errBytes = []byte(`{"code":"error_serialisation_fail"}`)
+		body = []byte(`{"code":"error_serialisation_fail"}`)
 	}
 
-	sendHTTPResponse(w, errBytes, status)
+	w.WriteHeader(status)
+	w.Write(body)
 }
