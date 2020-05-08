@@ -38,7 +38,7 @@ func (s *Service) WrapAPIGatewayHTTP() LambdaAPIGatewayHandler {
 				}
 			}
 
-			s.IdentityProvider(ctx, atclaims)
+			ctx = s.IdentityProvider(ctx, atclaims)
 		}
 
 		if len(event.PathParameters) < 1 {
