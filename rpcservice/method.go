@@ -16,64 +16,6 @@ import (
 	"github.com/xeipuuv/gojsonschema"
 )
 
-var errorType = reflect.TypeOf((*error)(nil)).Elem()
-var contextType = reflect.TypeOf((*context.Context)(nil)).Elem()
-
-// IdentityContextProvider is a function which augments the request context indended to allow developers to add their own state based on a provided access token
-type IdentityContextProvider func(ctx context.Context, claims map[string]interface{}) context.Context
-
-// Service encapsulates an instance of an RPC Service
-type Service struct {
-	Logger           *logrus.Entry
-	Methods          map[string]*Method
-	IdentityProvider IdentityContextProvider
-}
-
-// NewService creates a Service
-func NewService(l *logrus.Entry) *Service {
-	return &Service{Logger: l, Methods: make(map[string]*Method)}
-}
-
-// WithIdentityProvider attaches an identity provider function to the service
-func (s *Service) WithIdentityProvider(idp IdentityContextProvider) *Service {
-	s.IdentityProvider = idp
-	return s
-}
-
-// AddMethod creates a Method and adds it to the service
-func (s *Service) AddMethod(methodName string, handler interface{}, schema gojsonschema.JSONLoader) *Service {
-	method := &Method{
-		Name:    methodName,
-		Handler: handler,
-	}
-
-	if schema != nil {
-		sc, err := gojsonschema.NewSchema(schema)
-		if err != nil {
-			panic(fmt.Errorf("runtime cannot parse schema for method %s: %w", methodName, err))
-		}
-
-		method.CompiledSchema = sc
-	}
-
-	hasReqBody, hasResBody, err := validateMethod(method)
-	if err != nil {
-		panic(fmt.Errorf("runtime cannot add rpc method %s: %w", methodName, err))
-	}
-
-	method.expectsRequestBody = hasReqBody
-	method.expectsResponseBody = hasResBody
-
-	s.Methods[methodName] = method
-	return s
-}
-
-// GetMethod finds an attached Method by name
-func (s *Service) GetMethod(methodName string) (*Method, bool) {
-	m, ok := s.Methods[methodName]
-	return m, ok
-}
-
 // Method holds properties about an RPC method as well as the handler function itself
 type Method struct {
 	Name                string

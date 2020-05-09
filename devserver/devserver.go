@@ -57,7 +57,7 @@ func (s *Server) AddService(path string, svc *rpcservice.Service, authnr *Authen
 		r.Options("/*", optionsHandler)
 
 		for name, method := range svc.Methods {
-			r.Post("/"+name, wrapRPCMethod(method))
+			r.Post("/"+name, wrapRPCMethod(svc, method))
 		}
 	})
 
@@ -123,9 +123,10 @@ func newAuthenticationMiddleware(authenticator *Authenticator, identityProvider 
 	}
 }
 
-func wrapRPCMethod(method *rpcservice.Method) http.HandlerFunc {
+func wrapRPCMethod(svc *rpcservice.Service, method *rpcservice.Method) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		reqLogger := logger.FromContext(r.Context())
+		ctx := r.Context()
+		reqLogger := logger.FromContext(ctx)
 
 		setCORSHeaders(w)
 
@@ -140,7 +141,11 @@ func wrapRPCMethod(method *rpcservice.Method) http.HandlerFunc {
 			return
 		}
 
-		result, err := method.Invoke(r.Context(), body)
+		for _, fn := range svc.ContextProviders {
+			ctx = fn(ctx)
+		}
+
+		result, err := method.Invoke(ctx, body)
 		if err != nil {
 			sendHTTPError(w, err)
 			return

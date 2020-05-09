@@ -57,6 +57,10 @@ func (s *Service) WrapAPIGatewayHTTP() LambdaAPIGatewayHandler {
 			return apiGatewayErrorResponse(hand.New("method_not_found")), nil
 		}
 
+		for _, fn := range s.ContextProviders {
+			ctx = fn(ctx)
+		}
+
 		result, err := handler.Invoke(ctx, []byte(event.Body))
 		if err != nil {
 			return apiGatewayErrorResponse(err), nil
