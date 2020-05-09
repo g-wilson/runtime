@@ -19,11 +19,8 @@ import (
 var errorType = reflect.TypeOf((*error)(nil)).Elem()
 var contextType = reflect.TypeOf((*context.Context)(nil)).Elem()
 
-// AccessTokenClaims represents claims data from the JWT access token
-type AccessTokenClaims map[string]interface{}
-
 // IdentityContextProvider is a function which augments the request context indended to allow developers to add their own state based on a provided access token
-type IdentityContextProvider func(ctx context.Context, claims AccessTokenClaims) context.Context
+type IdentityContextProvider func(ctx context.Context, claims map[string]interface{}) context.Context
 
 // Service encapsulates an instance of an RPC Service
 type Service struct {

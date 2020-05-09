@@ -7,16 +7,10 @@ import (
 	"github.com/g-wilson/runtime"
 	"github.com/g-wilson/runtime/hand"
 	"github.com/g-wilson/runtime/logger"
-	"github.com/g-wilson/runtime/rpcservice"
 
 	"gopkg.in/square/go-jose.v2"
 	"gopkg.in/square/go-jose.v2/jwt"
 )
-
-type AccessTokenClaims struct {
-	rpcservice.AccessTokenClaims
-	jwt.Claims
-}
 
 // Authenticator type is used to validate JWT access tokens and convert them into Bearer
 // types which can be used by runtime to evaluate authentication state
@@ -34,7 +28,7 @@ func NewAuthenticator(keys *jose.JSONWebKeySet, issuer string) *Authenticator {
 }
 
 // Authenticate validates the provided JWT access token and returns the claims
-func (a *Authenticator) Authenticate(ctx context.Context, token string) (rpcservice.AccessTokenClaims, error) {
+func (a *Authenticator) Authenticate(ctx context.Context, token string) (map[string]interface{}, error) {
 	tok, err := jwt.ParseSigned(token)
 	if err != nil {
 		return nil, hand.New(runtime.ErrCodeInvalidToken).WithMessage("jwt parse error")
@@ -57,7 +51,7 @@ func (a *Authenticator) Authenticate(ctx context.Context, token string) (rpcserv
 		return nil, hand.New(runtime.ErrCodeInvalidToken).WithMessage("jwt validation error")
 	}
 
-	svcClaims := rpcservice.AccessTokenClaims{}
+	svcClaims := map[string]interface{}{}
 	tok.UnsafeClaimsWithoutVerification(&svcClaims)
 
 	return svcClaims, nil
