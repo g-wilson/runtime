@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/g-wilson/runtime"
+	ctxtool "github.com/g-wilson/runtime/context"
 	"github.com/g-wilson/runtime/hand"
 	"github.com/g-wilson/runtime/logger"
 )
@@ -69,7 +70,7 @@ func (c *RPCClient) Do(ctx context.Context, method string, reqBody interface{}, 
 
 	logger.FromContext(ctx).Entry().WithError(parsedErr).Warn("downstream rpc request failed")
 
-	return hand.New(ErrCodeDownstream)
+	return hand.New(runtime.ErrCodeDownstream)
 }
 
 func (c *RPCClient) doInternal(ctx context.Context, method string, reqBody interface{}, res interface{}) (err error) {
@@ -101,7 +102,7 @@ func (c *RPCClient) doInternal(ctx context.Context, method string, reqBody inter
 		req.Header.Add("Authorization", c.accessToken)
 	}
 
-	requestID := runtime.GetRequestIDContext(ctx)
+	requestID := ctxtool.GetRequestID(ctx)
 	if requestID != "" {
 		req.Header.Add("X-Request-ID", requestID)
 	}
