@@ -36,7 +36,6 @@ func New(addr string) *Server {
 	r.Use(middleware.Recoverer)
 	r.Use(middleware.Timeout(60 * time.Second))
 	r.Use(middleware.AllowContentType("application/json"))
-	r.Use(attachRequestLogger(log))
 
 	s := &Server{
 		ListenAddress: addr,
@@ -50,6 +49,8 @@ func New(addr string) *Server {
 // AddService maps an RPC Service's methods to HTTP path on the server's router
 func (s *Server) AddService(path string, svc *rpcservice.Service, authnr *Authenticator) *Server {
 	s.r.Route(fmt.Sprintf("/%s", path), func(r chi.Router) {
+		r.Use(attachRequestLogger(svc.Logger))
+
 		if authnr != nil {
 			r.Use(newAuthenticationMiddleware(authnr, svc.IdentityProvider))
 		}
