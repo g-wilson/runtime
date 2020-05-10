@@ -10,7 +10,7 @@ import (
 	"strings"
 
 	"github.com/g-wilson/runtime"
-	ctxtool "github.com/g-wilson/runtime/context"
+	"github.com/g-wilson/runtime/ctxtools"
 	"github.com/g-wilson/runtime/hand"
 	"github.com/g-wilson/runtime/logger"
 )
@@ -102,7 +102,7 @@ func (c *RPCClient) doInternal(ctx context.Context, method string, reqBody inter
 		req.Header.Add("Authorization", c.accessToken)
 	}
 
-	requestID := ctxtool.GetRequestID(ctx)
+	requestID := ctxtools.GetRequestID(ctx)
 	if requestID != "" {
 		req.Header.Add("X-Request-ID", requestID)
 	}
