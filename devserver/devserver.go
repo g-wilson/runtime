@@ -130,9 +130,8 @@ func wrapRPCMethod(svc *rpcservice.Service, method *rpcservice.Method) http.Hand
 		ctx := ctxtools.SetRequestID(r.Context(), middleware.GetReqID(r.Context()))
 		reqLogger := logger.FromContext(ctx)
 
-		setCORSHeaders(w)
-
 		if r.Body == nil {
+			setCORSHeaders(w)
 			http.Error(w, runtime.ErrCodeMissingBody, http.StatusBadRequest)
 			return
 		}
@@ -164,6 +163,7 @@ func wrapRPCMethod(svc *rpcservice.Service, method *rpcservice.Method) http.Hand
 			sendHTTPError(w, hand.New(runtime.ErrCodeUnknown))
 		}
 
+		setCORSHeaders(w)
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(http.StatusOK)
 		w.Write(resBytes)
@@ -216,6 +216,7 @@ func sendHTTPError(w http.ResponseWriter, err error) {
 		body = []byte(`{"code":"error_serialisation_fail"}`)
 	}
 
+	setCORSHeaders(w)
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(status)
 	w.Write(body)
