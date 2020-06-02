@@ -56,7 +56,7 @@ func (m *Method) Invoke(ctx context.Context, body []byte) (interface{}, error) {
 			}
 
 			reqLogger.Entry().
-				WithField("handler_duration", time.Now().Sub(startedAt).String()).
+				WithField("handler_duration", time.Now().Sub(startedAt).Microseconds()).
 				WithField("err_code", "schema_fail").
 				Info("rpc request handled error")
 
@@ -69,7 +69,7 @@ func (m *Method) Invoke(ctx context.Context, body []byte) (interface{}, error) {
 	if len(body) > 0 {
 		if !m.expectsRequestBody {
 			reqLogger.Entry().
-				WithField("handler_duration", time.Now().Sub(startedAt).String()).
+				WithField("handler_duration", time.Now().Sub(startedAt).Microseconds()).
 				WithField("err_code", "request_body_not_expected").
 				Info("rpc request handled error")
 
@@ -81,7 +81,7 @@ func (m *Method) Invoke(ctx context.Context, body []byte) (interface{}, error) {
 		if err != nil {
 			reqLogger.Entry().
 				WithError(fmt.Errorf("error parsing request body: %w", err)).
-				WithField("handler_duration", time.Now().Sub(startedAt).String()).
+				WithField("handler_duration", time.Now().Sub(startedAt).Microseconds()).
 				Info("request handled error")
 
 			return nil, hand.New("invalid_body").WithMessage("body parsing error")
@@ -91,7 +91,7 @@ func (m *Method) Invoke(ctx context.Context, body []byte) (interface{}, error) {
 	} else {
 		if m.expectsRequestBody {
 			reqLogger.Entry().
-				WithField("handler_duration", time.Now().Sub(startedAt).String()).
+				WithField("handler_duration", time.Now().Sub(startedAt).Microseconds()).
 				WithField("err_code", "request_body_expected").
 				Info("rpc request handled error")
 
@@ -105,7 +105,7 @@ func (m *Method) Invoke(ctx context.Context, body []byte) (interface{}, error) {
 
 	if resultErr.IsNil() {
 		reqLogger.Entry().
-			WithField("handler_duration", time.Now().Sub(startedAt).String()).
+			WithField("handler_duration", time.Now().Sub(startedAt).Microseconds()).
 			Info("rpc request handled")
 
 		return result[0].Interface(), nil
@@ -116,7 +116,7 @@ func (m *Method) Invoke(ctx context.Context, body []byte) (interface{}, error) {
 	handErr, ok := err.(hand.E)
 	if !ok {
 		reqLogger.Entry().
-			WithField("handler_duration", time.Now().Sub(startedAt).String()).
+			WithField("handler_duration", time.Now().Sub(startedAt).Microseconds()).
 			WithError(err).
 			Error("rpc request unhandled error")
 
@@ -133,7 +133,7 @@ func (m *Method) Invoke(ctx context.Context, body []byte) (interface{}, error) {
 	}
 
 	reqLogger.Entry().
-		WithField("handler_duration", time.Now().Sub(startedAt).String()).
+		WithField("handler_duration", time.Now().Sub(startedAt).Microseconds()).
 		Warn("rpc request handled error")
 
 	return nil, handErr
