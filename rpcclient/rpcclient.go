@@ -104,7 +104,7 @@ func (c *RPCClient) doInternal(ctx context.Context, method string, reqBody inter
 
 	requestID := ctxtools.GetRequestID(ctx)
 	if requestID != "" {
-		req.Header.Add("X-Request-ID", requestID)
+		req.Header.Add("X-Parent-Request-ID", requestID)
 	}
 
 	resp, err := c.httpClient.Do(req)
