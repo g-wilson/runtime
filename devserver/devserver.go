@@ -100,18 +100,35 @@ func newAuthenticationMiddleware(authenticator *Authenticator, identityProvider 
 				return
 			}
 
+			reqLogger := logger.FromContext(r.Context())
+
 			token := r.Header.Get("authorization")
 			if token == "" {
 				err := hand.New("authentication_required")
-				logger.FromContext(r.Context()).Entry().WithError(err).Error("request failed")
+
+				reqLogger.Entry().
+					WithError(err).
+					Warn("devserver: jwt auth required")
+
 				sendHTTPError(w, err)
 				return
 			}
 
 			claims, err := authenticator.Authenticate(r.Context(), token)
 			if err != nil {
-				reqLogger := logger.FromContext(r.Context())
-				reqLogger.Entry().WithError(fmt.Errorf("jwt authenticator failed: %w", err)).Error("request failed")
+				reqLogger.Update(reqLogger.Entry().WithError(err))
+
+				if handErr, ok := err.(hand.E); ok {
+					if handErr.Err != nil {
+						reqLogger.Update(reqLogger.Entry().WithField("err_cause", handErr.Err))
+					}
+					if handErr.Message != "" {
+						reqLogger.Update(reqLogger.Entry().WithField("err_message", handErr.Message))
+					}
+				}
+
+				reqLogger.Entry().Warn("devserver: jwt auth failed")
+
 				sendHTTPError(w, err)
 				return
 			}

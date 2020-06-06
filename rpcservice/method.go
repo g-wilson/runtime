@@ -55,12 +55,14 @@ func (m *Method) Invoke(ctx context.Context, body []byte) (interface{}, error) {
 				})
 			}
 
-			reqLogger.Entry().
-				WithField("handler_duration", time.Now().Sub(startedAt).Microseconds()).
-				WithField("err_code", "schema_fail").
-				Info("rpc request handled error")
+			err := hand.New("schema_fail").WithMeta(hand.M{"reasons": reasons})
 
-			return nil, hand.New("schema_fail").WithMeta(hand.M{"reasons": reasons})
+			reqLogger.Entry().
+				WithError(err).
+				WithField("handler_duration", getDuration(startedAt)).
+				Warn("rpc request handled error")
+
+			return nil, err
 		}
 	}
 
@@ -69,9 +71,9 @@ func (m *Method) Invoke(ctx context.Context, body []byte) (interface{}, error) {
 	if len(body) > 0 {
 		if !m.expectsRequestBody {
 			reqLogger.Entry().
-				WithField("handler_duration", time.Now().Sub(startedAt).Microseconds()).
-				WithField("err_code", "request_body_not_expected").
-				Info("rpc request handled error")
+				WithError(hand.New("request_body_not_expected")).
+				WithField("handler_duration", getDuration(startedAt)).
+				Warn("rpc request handled error")
 
 			return nil, hand.New("invalid_body").WithMessage("rpc method expects no request body")
 		}
@@ -81,8 +83,8 @@ func (m *Method) Invoke(ctx context.Context, body []byte) (interface{}, error) {
 		if err != nil {
 			reqLogger.Entry().
 				WithError(fmt.Errorf("error parsing request body: %w", err)).
-				WithField("handler_duration", time.Now().Sub(startedAt).Microseconds()).
-				Info("request handled error")
+				WithField("handler_duration", getDuration(startedAt)).
+				Warn("request handled error")
 
 			return nil, hand.New("invalid_body").WithMessage("body parsing error")
 		}
@@ -91,9 +93,9 @@ func (m *Method) Invoke(ctx context.Context, body []byte) (interface{}, error) {
 	} else {
 		if m.expectsRequestBody {
 			reqLogger.Entry().
-				WithField("handler_duration", time.Now().Sub(startedAt).Microseconds()).
-				WithField("err_code", "request_body_expected").
-				Info("rpc request handled error")
+				WithError(hand.New("request_body_expected")).
+				WithField("handler_duration", getDuration(startedAt)).
+				Warn("rpc request handled error")
 
 			return nil, hand.New("invalid_body").WithMessage("rpc method expects a request body")
 		}
@@ -101,42 +103,36 @@ func (m *Method) Invoke(ctx context.Context, body []byte) (interface{}, error) {
 		result = handlerValue.Call([]reflect.Value{reflect.ValueOf(ctx)})
 	}
 
+	reqLogger.Update(reqLogger.Entry().WithField("handler_duration", getDuration(startedAt)))
+
 	resultErr := result[len(result)-1]
 
 	if resultErr.IsNil() {
-		reqLogger.Entry().
-			WithField("handler_duration", time.Now().Sub(startedAt).Microseconds()).
-			Info("rpc request handled")
+		reqLogger.Entry().Info("rpc request handled")
 
 		return result[0].Interface(), nil
 	}
 
 	err, _ := resultErr.Interface().(error)
 
-	handErr, ok := err.(hand.E)
-	if !ok {
-		reqLogger.Entry().
-			WithField("handler_duration", time.Now().Sub(startedAt).Microseconds()).
-			WithError(err).
-			Error("rpc request unhandled error")
+	reqLogger.Update(reqLogger.Entry().WithError(err))
 
-		return nil, hand.New(runtime.ErrCodeUnknown)
+	if handErr, ok := err.(hand.E); ok {
+		if handErr.Err != nil {
+			reqLogger.Update(reqLogger.Entry().WithField("err_cause", handErr.Err))
+		}
+		if handErr.Message != "" {
+			reqLogger.Update(reqLogger.Entry().WithField("err_message", handErr.Message))
+		}
+
+		reqLogger.Entry().Warn("rpc request handled error")
+
+		return nil, handErr
 	}
 
-	reqLogger.Update(reqLogger.Entry().WithField("err_code", handErr.Code))
+	reqLogger.Entry().Error("rpc request unhandled error")
 
-	if handErr.Err != nil {
-		reqLogger.Update(reqLogger.Entry().WithError(handErr.Err))
-	}
-	if handErr.Message != "" {
-		reqLogger.Update(reqLogger.Entry().WithField("err_message", handErr.Message))
-	}
-
-	reqLogger.Entry().
-		WithField("handler_duration", time.Now().Sub(startedAt).Microseconds()).
-		Warn("rpc request handled error")
-
-	return nil, handErr
+	return nil, hand.New(runtime.ErrCodeUnknown)
 }
 
 // validateMethod analyses a Method for requirements before it can be served
@@ -218,4 +214,8 @@ func validateMethod(method *Method) (hasReqBody, hasResBody bool, err error) {
 	}
 
 	return
+}
+
+func getDuration(startedAt time.Time) float64 {
+	return float64(time.Now().Sub(startedAt).Microseconds()*100) / 100000
 }

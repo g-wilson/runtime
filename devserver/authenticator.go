@@ -6,7 +6,6 @@ import (
 
 	"github.com/g-wilson/runtime"
 	"github.com/g-wilson/runtime/hand"
-	"github.com/g-wilson/runtime/logger"
 
 	"gopkg.in/square/go-jose.v2"
 	"gopkg.in/square/go-jose.v2/jwt"
@@ -43,12 +42,32 @@ func (a *Authenticator) Authenticate(ctx context.Context, token string) (map[str
 		Time:   time.Now().UTC(),
 	})
 	if err != nil {
-		if err == jwt.ErrExpired {
-			return nil, hand.New(runtime.ErrCodeInvalidToken).WithMessage("token expired")
-		}
-		logger.FromContext(ctx).Entry().WithError(err).Warn("jwt validation error")
+		var msg string
 
-		return nil, hand.New(runtime.ErrCodeInvalidToken).WithMessage("jwt validation error")
+		switch true {
+		case err == jwt.ErrInvalidClaims:
+			msg = "invalid claims"
+		case err == jwt.ErrInvalidIssuer:
+			msg = "invalid issuer"
+		case err == jwt.ErrInvalidSubject:
+			msg = "invalid subject"
+		case err == jwt.ErrInvalidAudience:
+			msg = "invalid audience"
+		case err == jwt.ErrInvalidID:
+			msg = "invalid id"
+		case err == jwt.ErrNotValidYet:
+			msg = "not valid yet"
+		case err == jwt.ErrExpired:
+			msg = "expired"
+		case err == jwt.ErrIssuedInTheFuture:
+			msg = "issued in future"
+		case err == jwt.ErrInvalidContentType:
+			msg = "invalid content type"
+		default:
+			msg = "jwt validation error"
+		}
+
+		return nil, hand.New(runtime.ErrCodeInvalidToken).WithMessage(msg)
 	}
 
 	svcClaims := map[string]interface{}{}
