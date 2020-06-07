@@ -170,6 +170,7 @@ func wrapRPCMethod(svc *rpcservice.Service, method *rpcservice.Method) http.Hand
 		}
 
 		if result == nil {
+			setCORSHeaders(w)
 			w.WriteHeader(http.StatusNoContent)
 			return
 		}
