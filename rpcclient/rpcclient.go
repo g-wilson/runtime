@@ -10,7 +10,6 @@ import (
 	"strings"
 
 	"github.com/g-wilson/runtime"
-	"github.com/g-wilson/runtime/ctxtools"
 	"github.com/g-wilson/runtime/hand"
 	"github.com/g-wilson/runtime/logger"
 )
@@ -100,11 +99,6 @@ func (c *RPCClient) doInternal(ctx context.Context, method string, reqBody inter
 
 	if c.accessToken != "" {
 		req.Header.Add("Authorization", c.accessToken)
-	}
-
-	requestID := ctxtools.GetRequestID(ctx)
-	if requestID != "" {
-		req.Header.Add("X-Parent-Request-ID", requestID)
 	}
 
 	resp, err := c.httpClient.Do(req)
