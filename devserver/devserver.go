@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/g-wilson/runtime"
-	"github.com/g-wilson/runtime/ctxtools"
 	"github.com/g-wilson/runtime/hand"
 	"github.com/g-wilson/runtime/logger"
 	"github.com/g-wilson/runtime/rpcservice"
@@ -144,7 +143,7 @@ func newAuthenticationMiddleware(authenticator *Authenticator, identityProvider 
 
 func wrapRPCMethod(svc *rpcservice.Service, method *rpcservice.Method) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		ctx := ctxtools.SetRequestID(r.Context(), middleware.GetReqID(r.Context()))
+		ctx := r.Context()
 		reqLogger := logger.FromContext(ctx)
 
 		if r.Body == nil {
