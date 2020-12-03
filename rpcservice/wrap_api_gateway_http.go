@@ -21,7 +21,7 @@ type LambdaAPIGatewayHandler func(context.Context, events.APIGatewayV2HTTPReques
 // WrapAPIGatewayHTTP wraps the service methods and returns a Lambda compatible handler function for HTTP API Gateway requests
 func (s *Service) WrapAPIGatewayHTTP() LambdaAPIGatewayHandler {
 	return func(ctx context.Context, event events.APIGatewayV2HTTPRequest) (res events.APIGatewayProxyResponse, err error) {
-		ctx = logger.SetContext(ctx, s.Logger.WithField("request_id", event.RequestContext.RequestID))
+		ctx = logger.SetContext(ctx, s.Logger.WithField("apig_request_id", event.RequestContext.RequestID))
 		reqLogger := logger.FromContext(ctx)
 
 		if s.IdentityProvider != nil {
