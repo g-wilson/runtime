@@ -125,7 +125,11 @@ func (m *Method) Invoke(ctx context.Context, body []byte) (interface{}, error) {
 			reqLogger.Update(reqLogger.Entry().WithField("err_message", handErr.Message))
 		}
 
-		reqLogger.Entry().Warn("rpc request handled error")
+		if handErr.Code == runtime.ErrCodeUnknown {
+			reqLogger.Entry().Error("rpc request handled error")
+		} else {
+			reqLogger.Entry().Warn("rpc request handled error")
+		}
 
 		return nil, handErr
 	}
