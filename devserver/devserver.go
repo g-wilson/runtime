@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/g-wilson/runtime"
+	"github.com/g-wilson/runtime/auth"
 	"github.com/g-wilson/runtime/hand"
 	"github.com/g-wilson/runtime/logger"
 	"github.com/g-wilson/runtime/rpcservice"
@@ -21,13 +22,12 @@ import (
 type Server struct {
 	ListenAddress string
 	Log           *logrus.Entry
-
-	authMiddleware func(next http.Handler) http.Handler
-	r              *chi.Mux
+	r             *chi.Mux
+	authn         *auth.Authenticator
 }
 
 // New creates a dev server
-func New(addr string) *Server {
+func New(addr string, authn *auth.Authenticator) *Server {
 	log := logger.Create("debug", "text", "debug")
 
 	r := chi.NewRouter()
@@ -41,24 +41,20 @@ func New(addr string) *Server {
 		ListenAddress: addr,
 		Log:           log,
 		r:             r,
+		authn:         authn,
 	}
 
 	return s
 }
 
 // AddService maps an RPC Service's methods to HTTP path on the server's router
-func (s *Server) AddService(path string, svc *rpcservice.Service, authnr *Authenticator) *Server {
+func (s *Server) AddService(path string, svc *rpcservice.Service) *Server {
 	s.r.Route(fmt.Sprintf("/%s", path), func(r chi.Router) {
 		r.Use(attachRequestLogger(svc.Logger))
-
-		if authnr != nil {
-			r.Use(newAuthenticationMiddleware(authnr, svc.IdentityProvider))
-		}
-
 		r.Options("/*", optionsHandler)
 
 		for name, method := range svc.Methods {
-			r.Post("/"+name, wrapRPCMethod(svc, method))
+			r.Post("/"+name, wrapRPCMethod(svc, method, s.authn))
 		}
 	})
 
@@ -91,57 +87,7 @@ func attachRequestLogger(logInstance *logrus.Entry) func(next http.Handler) http
 	}
 }
 
-func newAuthenticationMiddleware(authenticator *Authenticator, identityProvider rpcservice.IdentityContextProvider) func(next http.Handler) http.Handler {
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if r.Method == http.MethodOptions {
-				next.ServeHTTP(w, r)
-				return
-			}
-
-			reqLogger := logger.FromContext(r.Context())
-
-			token := r.Header.Get("authorization")
-			if token == "" {
-				err := hand.New("authentication_required")
-
-				reqLogger.Entry().
-					WithError(err).
-					Warn("devserver: jwt auth required")
-
-				sendHTTPError(w, err)
-				return
-			}
-
-			claims, err := authenticator.Authenticate(r.Context(), token)
-			if err != nil {
-				reqLogger.Update(reqLogger.Entry().WithError(err))
-
-				if handErr, ok := err.(hand.E); ok {
-					if handErr.Err != nil {
-						reqLogger.Update(reqLogger.Entry().WithField("err_cause", handErr.Err))
-					}
-					if handErr.Message != "" {
-						reqLogger.Update(reqLogger.Entry().WithField("err_message", handErr.Message))
-					}
-				}
-
-				reqLogger.Entry().Warn("devserver: jwt auth failed")
-
-				sendHTTPError(w, err)
-				return
-			}
-
-			ctx := identityProvider(r.Context(), claims)
-			r = r.WithContext(ctx)
-
-			next.ServeHTTP(w, r)
-			return
-		})
-	}
-}
-
-func wrapRPCMethod(svc *rpcservice.Service, method *rpcservice.Method) http.HandlerFunc {
+func wrapRPCMethod(svc *rpcservice.Service, method *rpcservice.Method, authn *auth.Authenticator) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		reqLogger := logger.FromContext(ctx)
@@ -156,6 +102,33 @@ func wrapRPCMethod(svc *rpcservice.Service, method *rpcservice.Method) http.Hand
 		if err != nil {
 			sendHTTPError(w, hand.New(runtime.ErrCodeInvalidBody))
 			return
+		}
+
+		if svc.IdentityProvider != nil {
+			token := r.Header.Get("authorization")
+			if token == "" {
+				err := hand.New("authentication_required")
+
+				reqLogger.Entry().
+					WithError(err).
+					Warn("devserver: jwt auth required")
+
+				sendHTTPError(w, err)
+				return
+			}
+
+			var atclaims map[string]interface{}
+			err := authn.Authenticate(r.Context(), token, &atclaims)
+			if err != nil {
+				reqLogger.Entry().
+					WithError(err).
+					Warn("devserver: jwt auth failed")
+
+				sendHTTPError(w, err)
+				return
+			}
+
+			ctx = svc.IdentityProvider(ctx, atclaims)
 		}
 
 		for _, fn := range svc.ContextProviders {

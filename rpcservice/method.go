@@ -188,7 +188,7 @@ func validateMethod(method *Method) (hasReqBody, hasResBody bool, err error) {
 
 		secondArgPtrType := secondArg.Elem()
 		if secondArgPtrType.Kind() != reflect.Struct {
-			err = fmt.Errorf("handler second argument must be struct, %s", secondArgPtrType.Kind())
+			err = fmt.Errorf("handler second argument must be struct, %s provided", secondArgPtrType.Kind())
 			return
 		}
 
