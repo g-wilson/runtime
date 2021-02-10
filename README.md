@@ -50,4 +50,3 @@ A basic HTTP server is provided which allows you to invoke RPC Methods locally.
 
 - API versioning
 - Explain in the readme how service-to-service communication can be implemented
-- Add support for asynchronous services rather than just RPC-style (e.g. using SQS as the trigger instead of API Gateway)
