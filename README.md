@@ -34,7 +34,7 @@ All invocations of RPC methods are logged. And the request logger understands th
 
 The Go context within a method is provided with a context-aware logger. This should be used within methods so that when your application writes log messages, you can have contextual data attached as fields automatically - such as the request ID, crucially!
 
-### Authentication
+### Authentication
 
 A lightweight `Claims` type is provided and attached to the request context to encapsulate authentication state. It is quite specific to JWTs.
 
