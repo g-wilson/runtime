@@ -1,9 +1,8 @@
-package rpcservice
+package rpcmethod
 
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -18,13 +17,13 @@ import (
 // LambdaAPIGatewayHandler is the expected function signature for AWS Lambda functions consuming events from API Gateway
 type LambdaAPIGatewayHandler func(context.Context, events.APIGatewayV2HTTPRequest) (events.APIGatewayProxyResponse, error)
 
-// WrapAPIGatewayHTTP wraps the service methods and returns a Lambda compatible handler function for HTTP API Gateway requests
-func (s *Service) WrapAPIGatewayHTTP() LambdaAPIGatewayHandler {
+// WrapAPIGatewayHTTP wraps the method and returns a Lambda compatible handler function for HTTP API Gateway requests
+func (m *Method) WrapAPIGatewayHTTP() LambdaAPIGatewayHandler {
 	return func(ctx context.Context, event events.APIGatewayV2HTTPRequest) (res events.APIGatewayProxyResponse, err error) {
-		ctx = logger.SetContext(ctx, s.Logger.WithField("apig_request_id", event.RequestContext.RequestID))
+		ctx = logger.SetContext(ctx, m.logger.WithField("apig_request_id", event.RequestContext.RequestID))
 		reqLogger := logger.FromContext(ctx)
 
-		if s.IdentityProvider != nil {
+		if m.identityProvider != nil {
 			authdata := event.RequestContext.Authorizer.JWT
 			atclaims := map[string]interface{}{}
 			atclaims["scope"] = strings.Join(authdata.Scopes, " ")
@@ -38,30 +37,19 @@ func (s *Service) WrapAPIGatewayHTTP() LambdaAPIGatewayHandler {
 				}
 			}
 
-			ctx = s.IdentityProvider(ctx, atclaims)
+			ctx = m.identityProvider(ctx, atclaims)
 		}
 
-		if len(event.PathParameters) < 1 {
-			reqLogger.Entry().WithError(errors.New("wrap http api gateway: no path parameters found")).Error("request failed")
-			return apiGatewayErrorResponse(hand.New("method_not_found")), nil
-		}
-		methodName, ok := event.PathParameters["method"]
-		if !ok {
-			reqLogger.Entry().WithError(errors.New("wrap http api gateway: method path parameter not found")).Error("request failed")
+		if m.handler == nil {
+			reqLogger.Entry().WithError(fmt.Errorf("wrap http api gateway: method has no handler")).Error("request failed")
 			return apiGatewayErrorResponse(hand.New("method_not_found")), nil
 		}
 
-		handler, ok := s.GetMethod(methodName)
-		if !ok {
-			reqLogger.Entry().WithError(fmt.Errorf("wrap http api gateway: method with name %s not found", methodName)).Error("request failed")
-			return apiGatewayErrorResponse(hand.New("method_not_found")), nil
-		}
-
-		for _, fn := range s.ContextProviders {
+		for _, fn := range m.contextProviders {
 			ctx = fn(ctx)
 		}
 
-		result, err := handler.Invoke(ctx, []byte(event.Body))
+		result, err := m.Invoke(ctx, []byte(event.Body))
 		if err != nil {
 			return apiGatewayErrorResponse(err), nil
 		}
