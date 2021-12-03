@@ -2,6 +2,9 @@ package hand
 
 import (
 	"fmt"
+	"net/http"
+
+	"github.com/g-wilson/runtime"
 )
 
 type M map[string]interface{}
@@ -33,6 +36,34 @@ func (h E) WithMeta(meta M) E {
 		Message: h.Message,
 		Meta:    meta,
 	}
+}
+
+func (h E) HTTPStatus() int {
+	var status int
+
+	switch h.Code {
+	case runtime.ErrCodeBadRequest:
+		fallthrough
+	case runtime.ErrCodeInvalidBody:
+		fallthrough
+	case runtime.ErrCodeSchemaFailure:
+		fallthrough
+	case runtime.ErrCodeMissingBody:
+		status = http.StatusBadRequest
+
+	case runtime.ErrCodeForbidden:
+		status = http.StatusForbidden
+
+	case runtime.ErrCodeNoAuthentication:
+		fallthrough
+	case runtime.ErrCodeInvalidAuthentication:
+		status = http.StatusUnauthorized
+
+	default:
+		status = http.StatusInternalServerError
+	}
+
+	return status
 }
 
 func New(code string) E {

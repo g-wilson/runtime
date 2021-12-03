@@ -1,4 +1,4 @@
-package logger
+package ctxlog
 
 import (
 	"context"
@@ -17,9 +17,9 @@ const (
 	TimestampKey = "t"
 )
 
-type ctxLoggerKey string
+type ctxLogKey string
 
-var loggerKey = ctxLoggerKey("ctxlogger")
+var logKey = ctxLogKey("ctxlog")
 
 // Create creates a new Logrus Entry with defaults
 func Create(servicename, format, level string) *logrus.Entry {
@@ -52,12 +52,12 @@ type ContextSafeLogger struct {
 
 // SetContext adds a logger to a context
 func SetContext(ctx context.Context, log *logrus.Entry) context.Context {
-	return context.WithValue(ctx, loggerKey, &ContextSafeLogger{entry: log})
+	return context.WithValue(ctx, logKey, &ContextSafeLogger{entry: log})
 }
 
 // FromContext retrieves a logger from the context
 func FromContext(ctx context.Context) *ContextSafeLogger {
-	if ctxLogger, ok := ctx.Value(loggerKey).(*ContextSafeLogger); ok {
+	if ctxLogger, ok := ctx.Value(logKey).(*ContextSafeLogger); ok {
 		return ctxLogger
 	}
 
