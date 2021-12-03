@@ -78,7 +78,7 @@ func (h JSONHandler) invoke(ctx context.Context, requestBodyBytes []byte) ([]byt
 	if h.compiledSchema != nil {
 		schemaResult, err := h.compiledSchema.Validate(gojsonschema.NewBytesLoader(requestBodyBytes))
 		if err != nil {
-			return nil, hand.New("invalid_body")
+			return nil, hand.New(hand.ErrCodeInvalidBody)
 		}
 		if !schemaResult.Valid() {
 			errs := schemaResult.Errors()
@@ -93,7 +93,7 @@ func (h JSONHandler) invoke(ctx context.Context, requestBodyBytes []byte) ([]byt
 				})
 			}
 
-			err := hand.New("schema_fail").WithMeta(hand.M{"reasons": reasons})
+			err := hand.New(hand.ErrCodeSchemaFailure).WithMeta(hand.M{"reasons": reasons})
 
 			return nil, err
 		}
@@ -103,20 +103,20 @@ func (h JSONHandler) invoke(ctx context.Context, requestBodyBytes []byte) ([]byt
 
 	if len(requestBodyBytes) > 0 {
 		if !h.expectsRequestBody {
-			return nil, hand.New("invalid_body").WithMessage("unexpected request body")
+			return nil, hand.New(hand.ErrCodeInvalidBody).WithMessage("unexpected request body")
 		}
 
 		req := reflect.New(handlerType.In(1).Elem())
 		err := json.Unmarshal(requestBodyBytes, req.Interface())
 		if err != nil {
-			return nil, hand.Wrap("invalid_body", fmt.Errorf("error parsing request body: %w", err)).
+			return nil, hand.Wrap(hand.ErrCodeInvalidBody, fmt.Errorf("error parsing request body: %w", err)).
 				WithMessage("unable to parse body")
 		}
 
 		result = handlerValue.Call([]reflect.Value{reflect.ValueOf(ctx), req})
 	} else {
 		if h.expectsRequestBody {
-			return nil, hand.New("invalid_body").WithMessage("expecting request body")
+			return nil, hand.New(hand.ErrCodeInvalidBody).WithMessage("expecting request body")
 		}
 
 		result = handlerValue.Call([]reflect.Value{reflect.ValueOf(ctx)})

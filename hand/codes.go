@@ -1,4 +1,4 @@
-package runtime
+package hand
 
 const ErrCodeUnknown = "unknown"
 const ErrCodeAccessDenied = "access_denied"
@@ -9,5 +9,3 @@ const ErrCodeSchemaFailure = "schema_validation_failed"
 const ErrCodeForbidden = "forbidden"
 const ErrCodeNoAuthentication = "no_authentication"
 const ErrCodeInvalidAuthentication = "invalid_authentication"
-const ErrCodeDownstream = "downstream_request_failed"
-const ErrCodeInvalidToken = "invalid_token"

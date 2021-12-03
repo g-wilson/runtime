@@ -3,8 +3,6 @@ package hand
 import (
 	"fmt"
 	"net/http"
-
-	"github.com/g-wilson/runtime"
 )
 
 type M map[string]interface{}
@@ -42,21 +40,21 @@ func (h E) HTTPStatus() int {
 	var status int
 
 	switch h.Code {
-	case runtime.ErrCodeBadRequest:
+	case ErrCodeBadRequest:
 		fallthrough
-	case runtime.ErrCodeInvalidBody:
+	case ErrCodeInvalidBody:
 		fallthrough
-	case runtime.ErrCodeSchemaFailure:
+	case ErrCodeSchemaFailure:
 		fallthrough
-	case runtime.ErrCodeMissingBody:
+	case ErrCodeMissingBody:
 		status = http.StatusBadRequest
 
-	case runtime.ErrCodeForbidden:
+	case ErrCodeForbidden:
 		status = http.StatusForbidden
 
-	case runtime.ErrCodeNoAuthentication:
+	case ErrCodeNoAuthentication:
 		fallthrough
-	case runtime.ErrCodeInvalidAuthentication:
+	case ErrCodeInvalidAuthentication:
 		status = http.StatusUnauthorized
 
 	default:

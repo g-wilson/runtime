@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/g-wilson/runtime"
 	"github.com/g-wilson/runtime/ctxlog"
 	"github.com/g-wilson/runtime/hand"
 
@@ -50,7 +49,7 @@ func CreateRequestLogger(l *logrus.Entry) Middleware {
 				reqLogger.Update(reqLogger.Entry().WithField("err_message", handErr.Message))
 			}
 
-			if handErr.Code == runtime.ErrCodeUnknown {
+			if handErr.Code == hand.ErrCodeUnknown {
 				reqLogger.Entry().Error("request: handled error")
 			} else {
 				reqLogger.Entry().Warn("request: handled error")
@@ -80,7 +79,7 @@ func JSONErrorHandler(h Handler) Handler {
 			serialisedError, _ = json.Marshal(handErr)
 		} else {
 			status = http.StatusInternalServerError
-			serialisedError, _ = json.Marshal(hand.New(runtime.ErrCodeUnknown))
+			serialisedError, _ = json.Marshal(hand.New(hand.ErrCodeUnknown))
 		}
 
 		return events.APIGatewayProxyResponse{
@@ -108,7 +107,7 @@ func TextErrorHandler(h Handler) Handler {
 			serialisedError = handErr.Error()
 		} else {
 			status = http.StatusInternalServerError
-			serialisedError = hand.New(runtime.ErrCodeUnknown).Error()
+			serialisedError = hand.New(hand.ErrCodeUnknown).Error()
 		}
 
 		return events.APIGatewayProxyResponse{
