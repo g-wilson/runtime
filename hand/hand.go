@@ -9,7 +9,7 @@ type M map[string]interface{}
 
 type E struct {
 	Code    string `json:"code"`
-	Err     error  `json:"-"`
+	Cause   error  `json:"-"`
 	Message string `json:"message,omitempty"`
 	Meta    M      `json:"meta,omitempty"`
 }
@@ -18,21 +18,30 @@ func (h E) Error() string {
 	return h.Code
 }
 
+func (h E) WithCause(err error) E {
+	return E{
+		Cause:   err,
+		Code:    h.Code,
+		Message: h.Message,
+		Meta:    h.Meta,
+	}
+}
+
 func (h E) WithMessage(msg string) E {
 	return E{
-		Code:    h.Code,
-		Err:     h.Err,
-		Meta:    h.Meta,
 		Message: msg,
+		Code:    h.Code,
+		Cause:   h.Cause,
+		Meta:    h.Meta,
 	}
 }
 
 func (h E) WithMeta(meta M) E {
 	return E{
-		Code:    h.Code,
-		Err:     h.Err,
-		Message: h.Message,
 		Meta:    meta,
+		Code:    h.Code,
+		Cause:   h.Cause,
+		Message: h.Message,
 	}
 }
 
@@ -69,7 +78,7 @@ func New(code string) E {
 }
 
 func Wrap(code string, err error) E {
-	return E{Code: code, Err: err}
+	return E{Code: code, Cause: err}
 }
 
 func Errorf(msg string, values ...interface{}) E {

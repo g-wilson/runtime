@@ -42,8 +42,8 @@ func CreateRequestLogger(l *logrus.Entry) Middleware {
 				return res, err
 			}
 
-			if handErr.Err != nil {
-				reqLogger.Update(reqLogger.Entry().WithField("err_cause", handErr.Err))
+			if handErr.Cause != nil {
+				reqLogger.Update(reqLogger.Entry().WithField("err_cause", handErr.Cause))
 			}
 			if handErr.Message != "" {
 				reqLogger.Update(reqLogger.Entry().WithField("err_message", handErr.Message))
